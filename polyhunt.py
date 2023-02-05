@@ -136,59 +136,72 @@ def kfold_cv_k(x, t, M, k):
     avg_error (float): average root mean squared error.
     """
     data = np.concatenate((x.reshape(-1, 1), t.reshape(-1, 1)), axis=1)
-    folds = np.array_split(data, k)
+    # folds = np.array_split(data, k)
     error_list = []
+    error_TRAINlist = []
+
+    # print(f"data shape = {data.shape}")
     for i in range(k):
-        validation_fold = folds[i]
-        training_folds = np.concatenate([folds[j] for j in range(k) if j != i])
+        validation_indices = np.array([j for j in range(len(x)) if j % k == i])
+        # print(f"k={k}, validation: {validation_indices.shape}")
+        # print(validation_indices)
+        validation_fold = data[validation_indices]
+        # print(f"valid f = {validation_fold.shape}")
+        training_indices = np.array([j for j in range(len(x)) if j % k != i])
+        # print(f"k={k}, training: {training_indices.shape}")
+
+        training_folds = data[training_indices]
         x_train, t_train = training_folds[:, 0], training_folds[:, 1]
-        x_val, t_val = validation_fold[:, 0], validation_fold[:, 1]
         phi_train = create_phi(x_train, M)
         w_train = regularized_linear_regression(phi_train, t_train, 0)
-        y_test = prediction(x_train, create_phi(x_train, M), w_train)
-        error = errorfunction(y_test, t_train)
+        ######
+        Y_train = prediction(x_train, phi_train, w_train)
+        error_TRAIN = errorfunction(Y_train, t_train)
+        error_TRAINlist.append(error_TRAIN)
+
+        ######
+        # print(f"w_train = {w_train}")
+
+        x_test, t_test = validation_fold[:, 0], validation_fold[:, 1]
+        phi_test = create_phi(x_test, M)
+        y_test = prediction(x_test, phi_test, w_train)
+
+        error = errorfunction(y_test, t_test)
         error_list.append(error)
     avg_error = np.mean(error_list)
-    return avg_error
+    avg_TRAINerror = np.mean(error_TRAINlist)
+
+    return avg_error, error_list, avg_TRAINerror, error_TRAINlist
 
 
 def solve_curve_fitting_k(x, t, M, k, gamma):
-    """
-    Curve Fitting
-
-    Parameters:
-    x (np.array): inputs, attributes.
-    t (np.array): outputs.
-    M (int): polynomial degree.
-    k (int): number of folds.
-    gamma (int): regularizor constant
-
-    Returns:
-    avg_error (float): average root mean squared error.
-    """
-
     phi = np.array(create_phi(x, M))
     w = regularized_linear_regression(phi, t, gamma)
     y = prediction(x, phi, w)
     error = errorfunction(y, t)
     rms = np.sqrt(2*error/len(x))
-    avg_error = kfold_cv_k(x, t, M, k)
+    k_fold = kfold_cv_k(x, t, M, k)
+    avg_error = k_fold[0]
+    errorlist = k_fold[1]
+    avg_TRAINerror = k_fold[2]
+    error_TRAINlist = k_fold[3]
+    # avg_error, errorlist, , error_TRAINlist = kfold_cv_k(x, t, M, k)
     k_rms = np.sqrt(2*avg_error/len(x))
+    k_rms_TRAIN = np.sqrt(2*avg_TRAINerror/len(x))
 
-    return w, y, error, rms, avg_error, k_rms
+    return w, y, error, rms, avg_error, k_rms, errorlist, k_rms_TRAIN, error_TRAINlist
     # return rms
 
 
 def plot_tt_k(x, t, m, ratio, k, gamma, plots):
-    x_train, t_train, x_test, t_test = split_data(x, t, ratio)
+    # x_train, t_train, x_test, t_test = split_data(x, t, ratio)
     M = np.arange(0, m)
     train_rms = []
     test_rms = []
     for i in M:
-        rms_train = solve_curve_fitting_k(x_train, t_train, i, k, gamma)
-        train_rms.append(rms_train[5])
-        rms_test = solve_curve_fitting_k(x_test, t_test, i, k, gamma)
-        test_rms.append(rms_test[5])
+        rms = solve_curve_fitting_k(x, t, i, k, gamma)
+        train_rms.append(rms[7])
+        test_rms.append(rms[5])
     if(plots):
         plt.plot(M, train_rms, '-o', label='Train RMS')
         plt.plot(M, test_rms, '-o', label='Test RMS')
