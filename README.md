@@ -15,7 +15,12 @@ For script without cross-validation
 python polyhunt\(1\).py --m 40 --g 0.0 --f X --i True --plots P 
 ```
 
+This one works good with $\lambda = 0.000001$ , MSE = 0.09
 
+```
+python polyhunt\(1\).py --m 25  --g 0.000001 --f Y --i True --plots P 
+
+```
 ## 1. Method. 
 
 Briefly and specifically describe your autofit method. If you introduced
