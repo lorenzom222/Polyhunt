@@ -25,6 +25,17 @@ def load_data(filepath):
     return np.array(X), np.array(y)
 
 
+def save_parameters(filepath, m, w):
+    if filepath:
+        # Save the best fit parameters to the filepath
+        with open(filepath, 'w') as f:
+
+            f.write(f'Polynomial Degree: {m}\nWeights: {w}')
+    else:
+        # Do not save the parameters if filepath is not supplied
+        pass
+
+
 def create_phi(x, degree):
     """
     This function creates a matrix of x values raised to powers.
@@ -56,7 +67,6 @@ def regularized_linear_regression(phi, t, lambda_):
     phit_phi = np.matmul(phi_t, phi)
     id = np.identity(size)
     phit_phi += lambda_ * id
-    # phit_phi_inv = np.linalg.inv(phit_phi)
     phit_phi_inv = np.linalg.inv(phit_phi)
 
     w_reg = np.matmul(phit_phi_inv, phi_t)
@@ -103,34 +113,21 @@ def kfold_cv_k(x, t, M, k, gamma):
     avg_error (float): average root mean squared error.
     """
     data = np.concatenate((x.reshape(-1, 1), t.reshape(-1, 1)), axis=1)
-    # folds = np.array_split(data, k)
     error_list = []
     error_TRAINlist = []
 
-    # print(f"data shape = {data.shape}")
     for i in range(k):
         training_indices = np.array([j for j in range(len(x)) if j % k == i])
         training_folds = data[training_indices]
 
         test_indices = np.array([j for j in range(len(x)) if j % k != i])
         test_fold = data[test_indices]
-
-        # print(f"k={k}, validation: {validation_indices.shape}")
-        # print(validation_indices)
-        # print(f"valid f = {validation_fold.shape}")
-
-        # print(f"k={k}, training: {training_indices.shape}")
-
         x_train, t_train = training_folds[:, 0], training_folds[:, 1]
         phi_train = create_phi(x_train, M)
         w_train = regularized_linear_regression(phi_train, t_train, gamma)
-        ######
         Y_train = prediction(phi_train, w_train)
         error_TRAIN = errorfunction(Y_train, t_train)
         error_TRAINlist.append(error_TRAIN)
-
-        ######
-        # print(f"w_train = {w_train}")
 
         x_test, t_test = test_fold[:, 0], test_fold[:, 1]
         phi_test = create_phi(x_test, M)
@@ -138,20 +135,12 @@ def kfold_cv_k(x, t, M, k, gamma):
 
         error = errorfunction(y_test, t_test)
         error_list.append(error)
-        # print(f"error = {error_list}")
 
     avg_error = np.mean(error_list)
-    # print(f"Test-Average Error = {avg_error}")
-    # print(f"Test-Average Error = {error_list}")
-
     avg_TRAINerror = np.mean(error_TRAINlist)
-    # print(f"Train-Average Error = {avg_TRAINerror}")
-    # print(f"Train-Average Error = {error_TRAINlist}")
 
-    # test_rms = np.sqrt(2*avg_error/len(x))
     test_rms = avg_error
     train_rms = avg_TRAINerror
-    # train_rms = np.sqrt(2*avg_TRAINerror/len(x))
 
     return test_rms, error_list, train_rms, error_TRAINlist
 
@@ -168,16 +157,13 @@ def solve_curve_fitting_k(x, t, M, k, gamma):
     errorlist = k_fold[1]
     avg_TRAINerror = k_fold[2]
     error_TRAINlist = k_fold[3]
-    # avg_error, errorlist, , error_TRAINlist = kfold_cv_k(x, t, M, k)
     k_rms = np.sqrt(2*avg_error/len(x))
     k_rms_TRAIN = np.sqrt(2*avg_TRAINerror/len(x))
 
     return w, y, error, rms, avg_error, k_rms, errorlist, k_rms_TRAIN, error_TRAINlist
-    # return rms
 
 
 def plot_tt_k(x, t, m, k, gamma, plots):
-    # x_train, t_train, x_test, t_test = split_data(x, t, ratio)
     M = np.arange(0, m)
     train_rms = []
     test_rms = []
@@ -197,40 +183,33 @@ def plot_tt_k(x, t, m, k, gamma, plots):
     return train_rms, test_rms
 
 
-def when_diverges(train, test):
-    for i in range(5, len(train)):
-        if train[i] > train[i-1] and train[i] > test[i]:
-            return i
-        if test[i] > test[i-1] and test[i] > train[i]:
-            return i
-        # if train[i] > train[i-1] != (test[i] > test[i-1]):
-        #     return i
-    return None
+def diverging_index(train_errors, test_errors):
+    return np.where(test_errors == np.min(test_errors))[0][0]
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--m', type=int,
+    parser.add_argument('-m', type=int,
                         help='integer - polynomial order (or maximum in autofit mode)')
 
-    parser.add_argument('--k', type=int,
+    parser.add_argument('-k', type=int,
                         help='integer - folds for cross validation')
 
-    parser.add_argument('--g', type=float, required=True,
+    parser.add_argument('-g', type=float, required=True,
                         help='float - regularization constant (use a default of 0')
 
-    parser.add_argument('--f', type=str,
+    parser.add_argument('-f', type=str,
                         help='the path of the file')
 
-    # parser.add_argument('modelOutput', type=str, required=True,
-    #                     help='integer - polynomial order (or maximum in autofit mode)')
+    parser.add_argument('-modelOutput', type=str,
+                        help='string - a filepath where the best fit parameters will be saved, if this is not supplied, then you do not have to output any model parameters')
 
-    # parser.add_argument('autofit', type=bool, required=True,
-    #                     help='integer - polynomial order (or maximum in autofit mode)')
-    parser.add_argument('--i', type=bool,
+    parser.add_argument('-af', type=bool,
+                        help='integer - polynomial order (or maximum in autofit mode)')
+    parser.add_argument('-i', type=bool,
                         help='Name and contact information')
-    parser.add_argument('--plots', type=bool,
+    parser.add_argument('-plots', type=bool,
                         help='Show plots')
 
 args = parser.parse_args()
@@ -238,9 +217,13 @@ M = args.m
 k = args.k
 gamma = args.g
 
-folder = "sampleData/"
-input = load_data(folder+args.f)
+# folder = "sampleData/"
+input = load_data(args.f)
 X, t = input
+modelOutput = args.modelOutput
+
+af = args.af
+
 i = args.i
 plots = args.plots
 
@@ -271,22 +254,30 @@ if(plots):
     plt.show()
 
 
-# print('Coefficients:', w)
-# print('Predicted values:', y)
-print('Mean Squared Error:', avg_error)
-print('Root-Mean-Squared:', k_rms)
-
 train_rms, test_rms = plot_tt_k(X, t, M, k, gamma, plots)
 
 
-index = when_diverges(train_rms, test_rms) - 1
+best_M = diverging_index(train_rms, test_rms)
 
+if(af):
+    best_fit = solve_curve_fitting_k(X, t, best_M, k, gamma)
+    best_weight = best_fit[0]
+    best_error = best_fit[4]
+    best_k_rms = best_fit[5]
+    print('Best:', best_M)
+    print('Best-Weight:', best_weight)
+    # print('Best-Mean Squared Error:', best_error)
+    # print('Best-Root-Mean-Squared:', best_k_rms)
 
-best_fit = solve_curve_fitting_k(X, t, index, k, gamma)
-best_fit = fit[0]
-best_error = fit[4]
-best_k_rms = fit[5]
-print('Best:', index)
-print('Best-Weight:', best_error)
-print('Best-Mean Squared Error:', best_error)
-print('Best-Root-Mean-Squared:', best_k_rms)
+else:
+    print('Best:', M)
+    print('Weights:', w)
+    # print('Predicted values:', y)
+    # print('Mean Squared Error:', avg_error)
+    # print('Root-Mean-Squared:', k_rms)
+
+if modelOutput:
+    if af:
+        save_parameters(modelOutput, best_M, best_weight)
+    else:
+        save_parameters(modelOutput, M, w)

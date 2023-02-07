@@ -2,30 +2,14 @@
 
 Example:
 ```
-python polyhunt.py --m POLYNOMIAL --k NUM_FOLDS --g GAMMA --f FILENAME --i INFO --plots SHOW_PLOTS
-```
-
-For script with k-folds
-```
-python polyhunt.py --m 40 --k 5 --g 0.0 --f X --i True --plots P
-```
-
-For script without cross-validation
-```
-python polyhunt\(1\).py --m 40 --g 0.0 --f X --i True --plots P 
-```
-
-This one works good with $\lambda = 0.000001$ , MSE = 0.09
-
-```
-python polyhunt\(1\).py --m 25  --g 0.000001 --f Y --i True --plots P 
-
+polyhunt.py [-h] [-m M] [-k K] -g G [-f F] [-modelOutput MODELOUTPUT] [-af AF] [-i I] [-plots PLOTS]
 ```
 
 ```
-python polyhunt\(2\).py --m 20 --k 5  --g 0.001 --f X --plots P
-
+python polyhunt.py -m 40 -k 10 -g 1e-5 -f sampleData/Y -modelOutput HW1 -af T -i T -plots T
 ```
+
+
 ## 1. Method. 
 
 Briefly and specifically describe your autofit method. If you introduced
