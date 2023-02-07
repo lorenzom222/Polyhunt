@@ -6,27 +6,6 @@ import argparse
 import sys
 
 
-def inverse_matrix(matrix):
-    det = np.linalg.det(matrix)
-    # if det == 0:
-    #     raise Exception("Matrix is not invertible")
-    # else:
-    n = matrix.shape[0]
-    identity = np.identity(n)
-    augmented_matrix = np.column_stack((matrix, identity))
-    for i in range(n):
-        pivot = augmented_matrix[i, i]
-        augmented_matrix[i, :] /= pivot
-        for j in range(i + 1, n):
-            factor = augmented_matrix[j, i]
-            augmented_matrix[j, :] -= factor * augmented_matrix[i, :]
-    for i in range(n - 1, -1, -1):
-        for j in range(i - 1, -1, -1):
-            factor = augmented_matrix[j, i]
-            augmented_matrix[j, :] -= factor * augmented_matrix[i, :]
-    return augmented_matrix[:, n:]
-
-
 def load_data(filepath):
     """    
     Parameters:
@@ -78,34 +57,14 @@ def regularized_linear_regression(phi, t, lambda_):
     id = np.identity(size)
     phit_phi += lambda_ * id
     # phit_phi_inv = np.linalg.inv(phit_phi)
-    phit_phi_inv = inverse_matrix(phit_phi)
+    phit_phi_inv = np.linalg.inv(phit_phi)
 
     w_reg = np.matmul(phit_phi_inv, phi_t)
     w = np.matmul(w_reg, t)
     return w
 
 
-# def sweep(X, m, lambda_):
-#     """
-#     Sweep up to max polynomial (m).
-
-#     Parameters:
-#     X : Training data input. (trainPath)
-#     m : Given polynomial.
-#     lambda_ : Regularization parameter.
-
-#     Returns:
-#     weight_list : List of best regularized weights per polynomial.
-#     """
-#     weight_list = []
-#     for i in range(m+1):
-#         phi_m = create_phi(X, i)
-#         weight = regularized_linear_regression(phi_m, t, 0)
-#         weight_list.append(weight)
-#     return weight_list
-
-
-def prediction(X, phi, w):
+def prediction(phi, w):
     """
     Compute prediction for polynomial regression.
 
@@ -122,30 +81,15 @@ def prediction(X, phi, w):
 
 
 def errorfunction(y, t):
-    error = 0.0
-    for i in range(len(y)):
-        error += (y[i]-t[i])**2
+    d = y-t
+    d = d**2
+    d = np.sum(d)
+    d = np.sqrt(d/len(y))
 
-    return 1/2*error
-
-
-def split_data(x, t, ratio):
-    # Shuffle data
-    shuffle_index = np.random.permutation(len(x))
-    x = x[shuffle_index]
-    t = t[shuffle_index]
-
-    # Split data into training and test sets
-    split_index = int(len(x) * ratio)
-    x_train = x[:split_index]
-    t_train = t[:split_index]
-    x_test = x[split_index:]
-    t_test = t[split_index:]
-
-    return x_train, t_train, x_test, t_test
+    return d
 
 
-def kfold_cv_k(x, t, M, k):
+def kfold_cv_k(x, t, M, k, gamma):
     """
     K-Fold Cross Validation
 
@@ -165,45 +109,61 @@ def kfold_cv_k(x, t, M, k):
 
     # print(f"data shape = {data.shape}")
     for i in range(k):
-        validation_indices = np.array([j for j in range(len(x)) if j % k == i])
+        training_indices = np.array([j for j in range(len(x)) if j % k == i])
+        training_folds = data[training_indices]
+
+        test_indices = np.array([j for j in range(len(x)) if j % k != i])
+        test_fold = data[test_indices]
+
         # print(f"k={k}, validation: {validation_indices.shape}")
         # print(validation_indices)
-        validation_fold = data[validation_indices]
         # print(f"valid f = {validation_fold.shape}")
-        training_indices = np.array([j for j in range(len(x)) if j % k != i])
+
         # print(f"k={k}, training: {training_indices.shape}")
 
-        training_folds = data[training_indices]
         x_train, t_train = training_folds[:, 0], training_folds[:, 1]
         phi_train = create_phi(x_train, M)
-        w_train = regularized_linear_regression(phi_train, t_train, 0)
+        w_train = regularized_linear_regression(phi_train, t_train, gamma)
         ######
-        Y_train = prediction(x_train, phi_train, w_train)
+        Y_train = prediction(phi_train, w_train)
         error_TRAIN = errorfunction(Y_train, t_train)
         error_TRAINlist.append(error_TRAIN)
 
         ######
         # print(f"w_train = {w_train}")
 
-        x_test, t_test = validation_fold[:, 0], validation_fold[:, 1]
+        x_test, t_test = test_fold[:, 0], test_fold[:, 1]
         phi_test = create_phi(x_test, M)
-        y_test = prediction(x_test, phi_test, w_train)
+        y_test = prediction(phi_test, w_train)
 
         error = errorfunction(y_test, t_test)
         error_list.append(error)
-    avg_error = np.mean(error_list)
-    avg_TRAINerror = np.mean(error_TRAINlist)
+        # print(f"error = {error_list}")
 
-    return avg_error, error_list, avg_TRAINerror, error_TRAINlist
+    avg_error = np.mean(error_list)
+    # print(f"Test-Average Error = {avg_error}")
+    # print(f"Test-Average Error = {error_list}")
+
+    avg_TRAINerror = np.mean(error_TRAINlist)
+    # print(f"Train-Average Error = {avg_TRAINerror}")
+    # print(f"Train-Average Error = {error_TRAINlist}")
+
+    # test_rms = np.sqrt(2*avg_error/len(x))
+    test_rms = avg_error
+    train_rms = avg_TRAINerror
+    # train_rms = np.sqrt(2*avg_TRAINerror/len(x))
+
+    return test_rms, error_list, train_rms, error_TRAINlist
 
 
 def solve_curve_fitting_k(x, t, M, k, gamma):
+
     phi = np.array(create_phi(x, M))
     w = regularized_linear_regression(phi, t, gamma)
-    y = prediction(x, phi, w)
+    y = prediction(phi, w)
     error = errorfunction(y, t)
     rms = np.sqrt(2*error/len(x))
-    k_fold = kfold_cv_k(x, t, M, k)
+    k_fold = kfold_cv_k(x, t, M, k, gamma)
     avg_error = k_fold[0]
     errorlist = k_fold[1]
     avg_TRAINerror = k_fold[2]
@@ -216,23 +176,36 @@ def solve_curve_fitting_k(x, t, M, k, gamma):
     # return rms
 
 
-def plot_tt_k(x, t, m, ratio, k, gamma, plots):
+def plot_tt_k(x, t, m, k, gamma, plots):
     # x_train, t_train, x_test, t_test = split_data(x, t, ratio)
     M = np.arange(0, m)
     train_rms = []
     test_rms = []
     for i in M:
-        rms = solve_curve_fitting_k(x, t, i, k, gamma)
-        train_rms.append(rms[7])
-        test_rms.append(rms[5])
+        cross_val = kfold_cv_k(x, t, i, k, gamma)
+        train_rms.append(cross_val[2])
+        test_rms.append(cross_val[0])
+
     if(plots):
         plt.plot(M, train_rms, '-o', label='Train RMS')
         plt.plot(M, test_rms, '-o', label='Test RMS')
+        plt.yscale('log')
         plt.xlabel('M (degree)')
         plt.ylabel('RMS')
         plt.legend()
         plt.show()
     return train_rms, test_rms
+
+
+def when_diverges(train, test):
+    for i in range(5, len(train)):
+        if train[i] > train[i-1] and train[i] > test[i]:
+            return i
+        if test[i] > test[i-1] and test[i] > train[i]:
+            return i
+        # if train[i] > train[i-1] != (test[i] > test[i-1]):
+        #     return i
+    return None
 
 
 if __name__ == '__main__':
@@ -279,7 +252,7 @@ if(i):
     print("|--------------------------------|\n")
 
 
-ratio = 8/10
+# ratio = 8/10
 fit = solve_curve_fitting_k(X, t, M, k, gamma)
 w = fit[0]
 y = fit[1]
@@ -292,8 +265,9 @@ if(plots):
     plt.plot(X, t, 'o', label='Target')
     plt.plot(X, y, '-', label='Prediction')
     plt.legend()
-    plt.title('MSE: {:.2f}'.format(avg_error) +
-              ' and K_RMS: {:.2f}'.format(k_rms))
+    plt.title('M: {:.0f}'.format(
+        M)+' | Error: {:.2f}'.format(avg_error) + ' and K_RMS: {:.2f}'.format(k_rms))
+
     plt.show()
 
 
@@ -302,22 +276,17 @@ if(plots):
 print('Mean Squared Error:', avg_error)
 print('Root-Mean-Squared:', k_rms)
 
-train_rms, test_rms = plot_tt_k(X, t, M, ratio, k, gamma, plots)
+train_rms, test_rms = plot_tt_k(X, t, M, k, gamma, plots)
 
 
-def when_diverges(train, test):
-    for i in range(5, len(train)):
-        if train[i] > train[i-1] and train[i] > test[i]:
-            return i
-        if test[i] > test[i-1] and test[i] > train[i]:
-            return i
-
-    return None
+index = when_diverges(train_rms, test_rms) - 1
 
 
-index = when_diverges(train_rms, test_rms)
-if index == None:
-    print('At Max Best Fit with input for M:', M)
-
-else:
-    print('Best Polynomia Degree (M):', index - 1)
+best_fit = solve_curve_fitting_k(X, t, index, k, gamma)
+best_fit = fit[0]
+best_error = fit[4]
+best_k_rms = fit[5]
+print('Best:', index)
+print('Best-Weight:', best_error)
+print('Best-Mean Squared Error:', best_error)
+print('Best-Root-Mean-Squared:', best_k_rms)
