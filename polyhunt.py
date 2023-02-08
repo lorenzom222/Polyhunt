@@ -43,9 +43,9 @@ def create_phi(x, degree):
     :param degree: degree of the polynomial
     :return: matrix of x values raised to powers
     """
-    matrix = np.zeros((len(x), degree + 1))
+    matrix = np.zeros((len(x), degree))
     for i in range(len(x)):
-        for j in range(degree + 1):
+        for j in range(degree):
             matrix[i][j] = x[i] ** j
     return matrix
 
